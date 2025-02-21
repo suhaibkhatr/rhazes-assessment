@@ -68,7 +68,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md dark:bg-gray-800">
           <h1 className="mb-6 text-2xl font-bold text-center text-gray-900 dark:text-white">
-            Sign in to your account
+            Sign in
           </h1>
 
           <div className="space-y-4">
@@ -118,12 +118,17 @@ export default function LoginPage() {
 
             {/* Google Login */}
             <Button
-              onClick={() => signIn("google", { callbackUrl: "/" })}
+              onClick={() => {signIn("google", { callbackUrl: process.env.NEXTAUTH_URL , NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET })}}
               className="w-full bg-blue-500 hover:bg-blue-600"
               disabled={isLoading}
             >
               Sign in with Google
             </Button>
+
+            <div className="flex justify-between text-sm">
+              <a href="/forgot-password" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Forgot Password?</a>
+              <a href="/register" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Create Account</a>
+            </div>
           </div>
         </div>
       </div>
