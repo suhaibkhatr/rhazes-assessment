@@ -1,9 +1,9 @@
 'use client';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { ModeToggle } from '../elements/toggle-mode';
 import { simulateLLMStreaming } from '@/lib/generator';
-import { CircleSlash, LogOut, MessageSquare } from 'lucide-react';
+import { CircleSlash, LogOut, MessageSquare, Smile, Send, Bot, Star } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ModelOptions } from '../elements/model-options';
 import Markdown from "react-markdown";
@@ -11,7 +11,6 @@ import { useLLMStore } from '@/store/llm-store';
 import { simulatedResponse } from '@/helper/helper';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from "next-auth/react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from '../ui/dropdown-menu';
 
 interface Chat {
   id: number;
@@ -19,6 +18,8 @@ interface Chat {
   messages: {
     user_input: string;
     answer: string;
+    is_starred?: boolean;
+    model?: string;
   }[];
 }
 
@@ -38,6 +39,7 @@ function HomePage() {
   const [currentResponse, setCurrentResponse] = useState<string>('');
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
   const streamingOptions = useRef<{ stop: boolean }>({ stop: false });
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -70,12 +72,21 @@ function HomePage() {
       setActiveChat(newChat);
     }
 
-    // Add user message immediately
-    const updatedMessages = [...currentChat.messages, { user_input: currentInput, answer: '' }];
+    // Add user message immediately with model information
+    const updatedMessages = [...currentChat.messages, { 
+      user_input: currentInput, 
+      answer: '', 
+      is_starred: false,
+      model: model // Include the selected model
+    }];
     updateChat(currentChat.id, { ...currentChat, messages: updatedMessages });
 
     let fullResponse = '';
-    for await (const chunk of simulateLLMStreaming(simulatedResponse, { delayMs: 200, chunkSize: 12, stop: streamingOptions.current.stop })) {
+    for await (const chunk of simulateLLMStreaming(simulatedResponse, { 
+      delayMs: 200, 
+      chunkSize: 12, 
+      stop: streamingOptions.current.stop,
+    })) {
       if (streamingOptions.current.stop) break;
       fullResponse += chunk;
       setCurrentResponse(fullResponse);
@@ -96,6 +107,16 @@ function HomePage() {
   const updateChat = (chatId: number, updatedChat: Chat) => {
     setChats(prev => prev.map(chat => chat.id === chatId ? updatedChat : chat));
     setActiveChat(updatedChat);
+  };
+
+  const toggleStar = (chatId: number, messageIndex: number) => {
+    const chat = chats.find(c => c.id === chatId);
+    if (chat) {
+      const updatedMessages = chat.messages.map((msg, idx) => 
+        idx === messageIndex ? { ...msg, is_starred: !msg.is_starred } : msg
+      );
+      updateChat(chatId, { ...chat, messages: updatedMessages });
+    }
   };
 
   const createNewChat = () => {
@@ -170,31 +191,66 @@ function HomePage() {
         {/* Chat messages */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800" ref={chatContainerRef}>
           <div className="max-w-3xl mx-auto">
+            {(!activeChat || activeChat.messages.length === 0) && (
+              <div className="flex flex-col items-center justify-center h-full py-12 space-y-6 text-center">
+                <Bot className="w-16 h-16 text-blue-500 animate-bounce" />
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome to Rhazes AI</h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-md">
+                  Start a conversation and explore the possibilities of AI-powered chat.
+                </p>
+              </div>
+            )}
             {activeChat?.messages.map((message, index) => (
-              <div key={index} className="space-y-4 py-4">
+              <div key={index} className="space-y-6 py-6 animate-fadeIn">
                 {/* User message - Right side */}
                 <div className="flex justify-end">
-                  <div className="max-w-[80%] flex gap-6 items-start">
-                    <div className="min-w-0">
-                      <div className="bg-blue-500 text-white p-6 rounded-2xl">
-                        <Markdown className="prose dark:prose-invert prose-sm max-w-none">
+                  <div className="max-w-[80%] flex gap-4 items-start">
+                    <div className="min-w-0 group relative">
+                      <div className="bg-blue-500 text-white px-6 py-4 rounded-2xl shadow-sm transform transition-all duration-300 hover:shadow-md hover:scale-[1.01] group-hover:bg-blue-600">
+                        <Markdown className="prose dark:prose-invert prose-sm max-w-none break-words">
                           {message.user_input}
                         </Markdown>
+                        {message.model && (
+                          <div className="mt-2 text-xs opacity-70 border-t border-white/20 pt-2">
+                            Using: {message.model}
+                          </div>
+                        )}
                       </div>
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-right pr-2">
+                        You
+                      </div>
+                      <button
+                        onClick={() => toggleStar(activeChat.id, index)}
+                        className="absolute -left-8 top-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        <Star
+                          className={`h-4 w-4 ${message.is_starred ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'} transition-all duration-300 hover:scale-125`}
+                        />
+                      </button>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-500 flex-shrink-0" />
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 shadow-sm border-2 border-white dark:border-gray-800" />
                   </div>
                 </div>
 
                 {/* AI message - Left side */}
                 <div className="flex justify-start">
-                  <div className="max-w-[80%] flex gap-6 items-start">
-                    <div className="w-8 h-8 rounded-full bg-green-500 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <div className="bg-gray-100 dark:bg-gray-700 p-6 rounded-2xl">
-                        <Markdown className="prose dark:prose-invert prose-sm max-w-none">
+                  <div className="max-w-[80%] flex gap-4 items-start">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500 flex-shrink-0 shadow-sm border-2 border-white dark:border-gray-800" />
+                    <div className="min-w-0 group">
+                      <div className="bg-gray-100 dark:bg-gray-700/80 px-6 py-4 rounded-2xl shadow-sm backdrop-blur-sm transform transition-all duration-300 hover:shadow-md hover:scale-[1.01] relative">
+                        {isTyping && index === activeChat.messages.length - 1 && (
+                          <div className="absolute -bottom-6 left-0 flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                            <span className="animate-bounce">●</span>
+                            <span className="animate-bounce delay-100">●</span>
+                            <span className="animate-bounce delay-200">●</span>
+                          </div>
+                        )}
+                        <Markdown className="prose dark:prose-invert prose-sm max-w-none break-words">
                           {message.answer || (index === activeChat.messages.length - 1 ? currentResponse : '')}
                         </Markdown>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pl-2">
+                        Assistant
                       </div>
                     </div>
                   </div>
@@ -232,11 +288,9 @@ function HomePage() {
                   type='submit' 
                   disabled={loading || !input.trim()}
                   size="icon"
-                  className="absolute right-2 bottom-2 h-8 w-8 bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
+                  className="absolute right-2 bottom-2 h-8 w-8 bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600 text-white transform transition-all duration-200 hover:scale-110"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" className="h-4 w-4 m-1">
-                    <path d="M.5 1.163A1 1 0 0 1 1.97.28l12.868 6.837a1 1 0 0 1 0 1.766L1.969 15.72A1 1 0 0 1 .5 14.836V10.33a1 1 0 0 1 .816-.983L8.5 8 1.316 6.653A1 1 0 0 1 .5 5.67V1.163Z" fill="currentColor"></path>
-                  </svg>
+                  <Send className="h-4 w-4" />
                 </Button>
               </div>
             </form>

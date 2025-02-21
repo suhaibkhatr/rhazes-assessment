@@ -40,6 +40,13 @@ interface ModelOptionsProps {
 export function ModelOptions({ className }: ModelOptionsProps) {
   const { selectedModel, setSelectedModel } = useLLMStore()
 
+  // Set default model if none is selected
+  React.useEffect(() => {
+    if (!selectedModel) {
+      setSelectedModel('GPT-3.5 Turbo')
+    }
+  }, [])
+
   const handleSelectModel = (model: string) => {
     setSelectedModel(model)
   }

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chat",
+  title: "Rhazes AI",
   description: "personal chatbot",
 };
 
