@@ -1,10 +1,12 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/primsa";
 import bcrypt from 'bcryptjs';
 
 const handler = NextAuth({
+  adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
@@ -24,6 +26,10 @@ const handler = NextAuth({
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
+
+        if (!user || !user.password) {
+          throw new Error("Invalid email or password");
+        }      
 
         const isMatch = await bcrypt.compare(credentials.password, user?.password || "");
         if (!user || !isMatch) {
@@ -52,12 +58,16 @@ const handler = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
       }
       return session;
     },
