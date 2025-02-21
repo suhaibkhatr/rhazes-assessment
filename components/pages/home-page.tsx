@@ -15,11 +15,13 @@ import { useSession, signOut } from "next-auth/react";
 interface Chat {
   id: number;
   name: string;
-  messages: {
-    user_input: string;
-    answer: string;
-    is_starred?: boolean;
-    model?: string;
+  prompts: {
+    prompt: string;
+    response: string;
+    isStarred?: boolean;
+    modelId?: number;
+    modelName?: string;
+    chatId: number;
   }[];
 }
 
@@ -45,6 +47,41 @@ function HomePage() {
 
   const model = useLLMStore().selectedModel;
 
+  // Fetch chat history when component mounts
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      try {
+        const response = await fetch('/api/chat');
+        if (!response.ok) throw new Error('Failed to fetch chat history');
+        
+        const data = await response.json();
+        const formattedChats: Chat[] = data.map((container: any) => ({
+          id: container.id,
+          name: container.title,
+          prompts: container.prompts.map((msg: any) => ({
+            id: msg.id,
+            prompt: msg.prompt,
+            response: msg.response,
+            isStarred: msg.isStarred,
+            model: msg.model,
+            modelId: msg.modelId,
+          }))
+        }));
+        
+        setChats(formattedChats);
+        if (formattedChats.length > 0) {
+          setActiveChat(formattedChats[0]);
+        }
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+      }
+    };
+
+    if (status === "authenticated") {
+      fetchChatHistory();
+    }
+  }, [status]);
+
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -65,7 +102,7 @@ function HomePage() {
       const newChat: Chat = {
         id: chats.length + 1,
         name: currentInput.substring(0, 30) + '...',
-        messages: []
+        prompts: []
       };
       setChats(prev => [...prev, newChat]);
       currentChat = newChat;
@@ -73,35 +110,76 @@ function HomePage() {
     }
 
     // Add user message immediately with model information
-    const updatedMessages = [...currentChat.messages, { 
-      user_input: currentInput, 
-      answer: '', 
-      is_starred: false,
-      model: model // Include the selected model
+    const updatedMessages = [...currentChat.prompts, { 
+      prompt: currentInput, 
+      response: '', 
+      isStarred: false,
+      modelId: model.id,
+      modelName: model.model,
+      chatId: currentChat.id,
     }];
-    updateChat(currentChat.id, { ...currentChat, messages: updatedMessages });
+    updateChat(currentChat.id, { ...currentChat, prompts: updatedMessages });
 
-    let fullResponse = '';
-    for await (const chunk of simulateLLMStreaming(simulatedResponse, { 
-      delayMs: 200, 
-      chunkSize: 12, 
-      stop: streamingOptions.current.stop,
-    })) {
-      if (streamingOptions.current.stop) break;
-      fullResponse += chunk;
-      setCurrentResponse(fullResponse);
+    try {
+      // Create a new prompt in the database
+      const promptResponse = await fetch(`/api/chat/${currentChat.id}/prompts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_input: currentInput,
+          model: model
+        })
+      });
+
+      if (!promptResponse.ok) {
+        throw new Error('Failed to create prompt');
+      }
+
+      const promptData = await promptResponse.json();
+      let fullResponse = '';
+      
+      for await (const chunk of simulateLLMStreaming(simulatedResponse, { 
+        delayMs: 200, 
+        chunkSize: 12, 
+        stop: streamingOptions.current.stop,
+      })) {
+        if (streamingOptions.current.stop) break;
+        fullResponse += chunk;
+        setCurrentResponse(fullResponse);
+        scrollToBottom();
+      }
+
+      // Update the prompt with the AI response
+      const updatePromptResponse = await fetch(`/api/chat/${currentChat.id}/prompts/${promptData.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          response: fullResponse
+        })
+      });
+
+      if (!updatePromptResponse.ok) {
+        throw new Error('Failed to update prompt with answer');
+      }
+
+      // Update the last message with the AI response
+      const finalMessages = updatedMessages.map((msg, idx) => 
+        idx === updatedMessages.length - 1 ? { ...msg, response: fullResponse } : msg
+      );
+      updateChat(currentChat.id, { ...currentChat, prompts: finalMessages });
+
+      setCurrentResponse('');
+    } catch (error) {
+      console.error('Error handling message:', error);
+      // You might want to show an error message to the user here
+    } finally {
+      setLoading(false);
       scrollToBottom();
     }
-
-    // Update the last message with the AI response
-    const finalMessages = updatedMessages.map((msg, idx) => 
-      idx === updatedMessages.length - 1 ? { ...msg, answer: fullResponse } : msg
-    );
-    updateChat(currentChat.id, { ...currentChat, messages: finalMessages });
-
-    setCurrentResponse('');
-    setLoading(false);
-    scrollToBottom();
   };
 
   const updateChat = (chatId: number, updatedChat: Chat) => {
@@ -109,26 +187,64 @@ function HomePage() {
     setActiveChat(updatedChat);
   };
 
-  const toggleStar = (chatId: number, messageIndex: number) => {
+  const toggleStar = async (chatId: number, messageIndex: number) => {
     const chat = chats.find(c => c.id === chatId);
     if (chat) {
-      const updatedMessages = chat.messages.map((msg, idx) => 
-        idx === messageIndex ? { ...msg, is_starred: !msg.is_starred } : msg
-      );
-      updateChat(chatId, { ...chat, messages: updatedMessages });
+      const prompt = chat.prompts[messageIndex];
+      try {
+        const response = await fetch(`/api/chat/${chatId}/prompts/${prompt.id}/star`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            isStarred: !prompt.isStarred
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to toggle star status');
+
+        const updatedPrompt = await response.json();
+        const updatedMessages = chat.prompts.map((msg, idx) => 
+          idx === messageIndex ? { ...msg, isStarred: updatedPrompt.isStarred } : msg
+        );
+        updateChat(chatId, { ...chat, prompts: updatedMessages });
+      } catch (error) {
+        console.error('Error toggling star status:', error);
+      }
     }
   };
 
-  const createNewChat = () => {
-    const newChat: Chat = {
-      id: chats.length + 1,
-      name: `New Chat ${chats.length + 1}`,
-      messages: []
-    };
-    setChats(prev => [...prev, newChat]);
-    setActiveChat(newChat);
-    setInput('');
-    setCurrentResponse('');
+  const createNewChat = async () => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: 'New Chat ' + (chats.length + 1)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create new chat');
+      }
+
+      const newChatData = await response.json();
+      const newChat: Chat = {
+        id: newChatData.id,
+        name: newChatData.title,
+        prompts: []
+      };
+
+      setChats(prev => [...prev, newChat]);
+      setActiveChat(newChat);
+      setInput('');
+      setCurrentResponse('');
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+    }
   };
 
   const handleStop = () => {
@@ -191,7 +307,7 @@ function HomePage() {
         {/* Chat messages */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800" ref={chatContainerRef}>
           <div className="max-w-3xl mx-auto">
-            {(!activeChat || activeChat.messages.length === 0) && (
+            {(!activeChat || activeChat.prompts.length === 0) && (
               <div className="flex flex-col items-center justify-center h-full py-12 space-y-6 text-center">
                 <Bot className="w-16 h-16 text-blue-500 animate-bounce" />
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome to Rhazes AI</h2>
@@ -200,7 +316,7 @@ function HomePage() {
                 </p>
               </div>
             )}
-            {activeChat?.messages.map((message, index) => (
+            {activeChat?.prompts.map((message, index) => (
               <div key={index} className="space-y-6 py-6 animate-fadeIn">
                 {/* User message - Right side */}
                 <div className="flex justify-end">
@@ -208,11 +324,11 @@ function HomePage() {
                     <div className="min-w-0 group relative">
                       <div className="bg-blue-500 text-white px-6 py-4 rounded-2xl shadow-sm transform transition-all duration-300 hover:shadow-md hover:scale-[1.01] group-hover:bg-blue-600">
                         <Markdown className="prose dark:prose-invert prose-sm max-w-none break-words">
-                          {message.user_input}
+                          {message.prompt}
                         </Markdown>
-                        {message.model && (
+                        {message.modelId && (
                           <div className="mt-2 text-xs opacity-70 border-t border-white/20 pt-2">
-                            Using: {message.model}
+                            Using: {message.modelName || `Model ${message.modelId}`}
                           </div>
                         )}
                       </div>
@@ -224,7 +340,7 @@ function HomePage() {
                         className="absolute -left-8 top-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                       >
                         <Star
-                          className={`h-4 w-4 ${message.is_starred ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'} transition-all duration-300 hover:scale-125`}
+                          className={`h-4 w-4 ${message.isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'} transition-all duration-300 hover:scale-125`}
                         />
                       </button>
                     </div>
@@ -238,7 +354,7 @@ function HomePage() {
                     <div className="w-8 h-8 rounded-full bg-emerald-500 flex-shrink-0 shadow-sm border-2 border-white dark:border-gray-800" />
                     <div className="min-w-0 group">
                       <div className="bg-gray-100 dark:bg-gray-700/80 px-6 py-4 rounded-2xl shadow-sm backdrop-blur-sm transform transition-all duration-300 hover:shadow-md hover:scale-[1.01] relative">
-                        {isTyping && index === activeChat.messages.length - 1 && (
+                        {isTyping && index === activeChat.prompts.length - 1 && (
                           <div className="absolute -bottom-6 left-0 flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
                             <span className="animate-bounce">●</span>
                             <span className="animate-bounce delay-100">●</span>
@@ -246,7 +362,7 @@ function HomePage() {
                           </div>
                         )}
                         <Markdown className="prose dark:prose-invert prose-sm max-w-none break-words">
-                          {message.answer || (index === activeChat.messages.length - 1 ? currentResponse : '')}
+                          {message.response || (index === activeChat.prompts.length - 1 ? currentResponse : '')}
                         </Markdown>
                       </div>
                       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pl-2">

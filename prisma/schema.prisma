@@ -19,8 +19,7 @@ model User {
   image             String?
   accounts          Account[]
   sessions          Session[]
-  promptsContainers PromptsContainer[]
-  prompts           Prompt[]
+  promptsContainers Chat[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -59,9 +58,9 @@ model Session {
   @@map("sessions")
 }
 
-model PromptsContainer {
+model Chat {
   id        Int      @id @default(autoincrement())
-  content   String
+  title     String
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   prompts   Prompt[]
@@ -69,7 +68,7 @@ model PromptsContainer {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
-  @@map("prompts_containers")
+  @@map("chats")
 }
 
 model AIModel {
@@ -84,18 +83,18 @@ model AIModel {
 }
 
 model Prompt {
-  id                 Int              @id @default(autoincrement())
-  promptsContainerId Int
-  promptsContainer   PromptsContainer @relation(fields: [promptsContainerId], references: [id])
-  userId             Int
-  user               User             @relation(fields: [userId], references: [id])
-  modelId            Int
-  model              AIModel          @relation(fields: [modelId], references: [id])
-  isStarred          Boolean          @default(false)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  id               Int      @id @default(autoincrement())
+  chatId           Int
+  promptsContainer Chat     @relation(fields: [chatId], references: [id])
+  modelId          Int
+  model            AIModel  @relation(fields: [modelId], references: [id])
+  isStarred        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  prompt           String
+  response         String
 
-  @@index([userId])
   @@index([modelId])
+  @@index([chatId])
   @@map("prompts")
 }

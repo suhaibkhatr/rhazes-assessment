@@ -13,74 +13,109 @@ import {
 import { useLLMStore } from "@/store/llm-store"
 
 interface ModelOption {
+  id: number;
   name: string;
   description: string;
 }
 
-const modelOptions: Record<string, ModelOption[]> = {
-  'GPT Models': [
-    { name: 'GPT-4', description: 'Most capable model, best for complex tasks' },
-    { name: 'GPT-3.5 Turbo', description: 'Fast and efficient for most tasks' },
-  ],
-  'Open Source Models': [
-    { name: 'Llama 2', description: 'Meta\'s open source LLM' },
-    { name: 'Claude 2', description: 'Anthropic\'s latest model' },
-    { name: 'Mistral', description: 'Efficient open source model' },
-  ],
-  'Specialized Models': [
-    { name: 'Code-Llama', description: 'Optimized for code generation' },
-    { name: 'PaLM 2', description: 'Google\'s language model' },
-  ]
+interface ModelOptionsResponse {
+  id: number;
+  name: string;
+  description: string;
 }
 
 interface ModelOptionsProps {
   className?: string;
 }
 
+interface AIModel {
+  id: number
+  model: string
+}
+
 export function ModelOptions({ className }: ModelOptionsProps) {
   const { selectedModel, setSelectedModel } = useLLMStore()
+  const [modelOptions, setModelOptions] = React.useState<ModelOption[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
 
-  // Set default model if none is selected
+  // Fetch models from the database
   React.useEffect(() => {
-    if (!selectedModel) {
-      setSelectedModel('GPT-3.5 Turbo')
+    const fetchModels = async () => {
+      try {
+        const response = await fetch('/api/models')
+        if (!response.ok) throw new Error('Failed to fetch models')
+
+        const data: ModelOptionsResponse[] = await response.json()
+
+        // Transform the data into ModelOption array
+        const models = data.map(model => ({
+          id: model.id,
+          name: model.name,
+          description: model.description,
+        }))
+
+        setModelOptions(models)
+        setIsLoading(false)
+
+        // Set default model if none is selected
+        if (models.length > 0) {
+          setSelectedModel({
+            id: models[0].id,
+            model: models[0].name,
+          })
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch models')
+        setIsLoading(false)
+      }
     }
+
+    fetchModels()
   }, [])
 
-  const handleSelectModel = (model: string) => {
+  const handleSelectModel = (model: AIModel) => {
     setSelectedModel(model)
+  }
+
+  if (error) {
+    return (
+      <Button variant="outline" className="min-w-[140px]" disabled>
+        Error loading models
+      </Button>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <Button variant="outline" className="min-w-[140px]" disabled>
+        Loading models...
+      </Button>
+    )
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="min-w-[140px]">
-          {selectedModel || 'Select Model'}
+          {selectedModel.model || 'Select Model'}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64">
         <DropdownMenuLabel>Select LLM Model</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {Object.entries(modelOptions).map(([category, models]) => (
-          <React.Fragment key={category}>
-            <DropdownMenuLabel className="text-sm text-muted-foreground px-2 py-1.5">
-              {category}
-            </DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {models.map((model) => (
-                <DropdownMenuItem
-                  key={model.name}
-                  onSelect={() => handleSelectModel(model.name)}
-                  className="flex flex-col items-start"
-                >
-                  <span className="font-medium">{model.name}</span>
-                  <span className="text-xs text-muted-foreground">{model.description}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-          </React.Fragment>
-        ))}
+        <DropdownMenuGroup>
+          {modelOptions.map((model) => (
+            <DropdownMenuItem
+              key={model.name}
+              onSelect={() => handleSelectModel({ id: model.id, model: model.name })}
+              className="flex flex-col items-start"
+            >
+              <span className="font-medium">{model.name}</span>
+              <span className="text-xs text-muted-foreground">{model.description}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
