@@ -28,7 +28,7 @@ interface Chat {
 function HomePage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  
+
   // Add session check
   React.useEffect(() => {
     if (status === "unauthenticated") {
@@ -53,7 +53,7 @@ function HomePage() {
       try {
         const response = await fetch('/api/chat');
         if (!response.ok) throw new Error('Failed to fetch chat history');
-        
+
         const data = await response.json();
         const formattedChats: Chat[] = data.map((container: any) => ({
           id: container.id,
@@ -67,7 +67,7 @@ function HomePage() {
             modelId: msg.modelId,
           }))
         }));
-        
+
         setChats(formattedChats);
         if (formattedChats.length > 0) {
           setActiveChat(formattedChats[0]);
@@ -90,35 +90,43 @@ function HomePage() {
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
-
     setLoading(true);
+    let currentChat = activeChat;
+    if (!currentChat) {
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: 'New Chat ' + (chats.length + 1)
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create new chat');
+        }
+
+        const newChatData = await response.json();
+        const newChat: Chat = {
+          id: newChatData.id,
+          name: newChatData.title,
+          prompts: []
+        };
+
+        setChats(prev => [...prev, newChat]);
+        currentChat = newChat; // Use local variable instead of state
+      } catch (error) {
+        console.error('Error creating new chat:', error);
+        return;
+      }
+    }
+
     streamingOptions.current.stop = false;
     const currentInput = input;
     setInput('');
 
-    // Create new chat if none is selected
-    let currentChat = activeChat;
-    if (!currentChat) {
-      const newChat: Chat = {
-        id: chats.length + 1,
-        name: currentInput.substring(0, 30) + '...',
-        prompts: []
-      };
-      setChats(prev => [...prev, newChat]);
-      currentChat = newChat;
-      setActiveChat(newChat);
-    }
-
-    // Add user message immediately with model information
-    const updatedMessages = [...currentChat.prompts, { 
-      prompt: currentInput, 
-      response: '', 
-      isStarred: false,
-      modelId: model.id,
-      modelName: model.model,
-      chatId: currentChat.id,
-    }];
-    updateChat(currentChat.id, { ...currentChat, prompts: updatedMessages });
 
     try {
       // Create a new prompt in the database
@@ -138,11 +146,17 @@ function HomePage() {
       }
 
       const promptData = await promptResponse.json();
+      // Update the messages with the prompt ID immediately after receiving it
+
+      // Add user message immediately with model information
+      const updatedMessages = [...currentChat.prompts, promptData];
+      updateChat(currentChat.id, { ...currentChat, prompts: updatedMessages });
+
       let fullResponse = '';
-      
-      for await (const chunk of simulateLLMStreaming(simulatedResponse, { 
-        delayMs: 200, 
-        chunkSize: 12, 
+
+      for await (const chunk of simulateLLMStreaming(simulatedResponse, {
+        delayMs: 200,
+        chunkSize: 12,
         stop: streamingOptions.current.stop,
       })) {
         if (streamingOptions.current.stop) break;
@@ -167,7 +181,7 @@ function HomePage() {
       }
 
       // Update the last message with the AI response
-      const finalMessages = updatedMessages.map((msg, idx) => 
+      const finalMessages = updatedMessages.map((msg, idx) =>
         idx === updatedMessages.length - 1 ? { ...msg, response: fullResponse } : msg
       );
       updateChat(currentChat.id, { ...currentChat, prompts: finalMessages });
@@ -205,7 +219,7 @@ function HomePage() {
         if (!response.ok) throw new Error('Failed to toggle star status');
 
         const updatedPrompt = await response.json();
-        const updatedMessages = chat.prompts.map((msg, idx) => 
+        const updatedMessages = chat.prompts.map((msg, idx) =>
           idx === messageIndex ? { ...msg, isStarred: updatedPrompt.isStarred } : msg
         );
         updateChat(chatId, { ...chat, prompts: updatedMessages });
@@ -267,7 +281,7 @@ function HomePage() {
           <MessageSquare className="h-4 w-4" />
           New Chat
         </Button>
-        
+
         <div className="space-y-2 overflow-y-auto">
           {chats.map((chat) => (
             <button
@@ -388,8 +402,8 @@ function HomePage() {
               )}
             </div>
 
-            <form 
-              onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} 
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
               className="flex items-end gap-3 relative"
             >
               <ModelOptions className="flex-none" />
@@ -400,8 +414,8 @@ function HomePage() {
                   onChange={(e) => setInput(e.target.value)}
                   className="pr-12 py-6 resize-none bg-white dark:bg-gray-700 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
-                <Button 
-                  type='submit' 
+                <Button
+                  type='submit'
                   disabled={loading || !input.trim()}
                   size="icon"
                   className="absolute right-2 bottom-2 h-8 w-8 bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600 text-white transform transition-all duration-200 hover:scale-110"
