@@ -1,6 +1,8 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import prisma from "@/lib/primsa";
+import bcrypt from 'bcryptjs';
 
 const handler = NextAuth({
   providers: [
@@ -9,20 +11,34 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     CredentialsProvider({
-      name: "Test Account",
+      name: "Email Login",
       credentials: {
-        username: { label: "Username", type: "text", placeholder: "test" },
+        email: { label: "Email", type: "email", placeholder: "name@example.com" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
-        if (credentials?.username === "test" && credentials?.password === "test") {
+      async authorize(credentials): Promise<any | null> {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Please enter both email and password");
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
+
+        const isMatch = await bcrypt.compare(credentials.password, user?.password || "");
+        if (!user || !isMatch) {
+          throw new Error("Invalid email or password");
+        }
+
+        if (user) {
           return {
-            id: "1",
-            name: "Test User",
-            email: "test@example.com",
+            id: user.id,
+            name: user.name,
+            email: user.email
           };
         }
-        return null;
+
+        throw new Error("Invalid email or password");
       }
     }),
   ],
