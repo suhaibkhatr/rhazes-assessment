@@ -8,6 +8,8 @@ services:
     image: starter
     ports:
       - 3000:3000
+    env_file:
+      - .env
   db:
     image: postgres:15-alpine
     restart: always

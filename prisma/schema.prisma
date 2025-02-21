@@ -12,3 +12,54 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Message {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  prompts   Prompt[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("messages")
+}
+
+model AIModel {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  row2      String?   // Purpose of this field needs clarification
+  row3      String?   // Purpose of this field needs clarification
+  prompts   Prompt[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("ai_models")
+}
+
+model Prompt {
+  id         Int       @id @default(autoincrement())
+  messageId  Int
+  message    Message   @relation(fields: [messageId], references: [id])
+  modelId    Int
+  aiModel    AIModel   @relation(fields: [modelId], references: [id])
+  userInput  String    @map("user_input")
+  answer     String
+  isStarred  Boolean   @default(false) @map("is_starred")
+  starredAt  DateTime? @map("starred_at")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("prompts")
+}

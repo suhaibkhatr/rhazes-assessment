@@ -26,6 +26,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Install Prisma CLI and generate Prisma Client
+RUN npm install -g prisma
+COPY prisma ./prisma
+RUN npx prisma generate
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
@@ -46,6 +51,9 @@ ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED=1
 
+# Copy Prisma schema for potential migrations
+COPY prisma ./prisma
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
@@ -56,6 +64,27 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Install Prisma CLI in production for migrations
+RUN npm install -g prisma
+
+# Create a startup script
+COPY --chown=nextjs:nodejs <<'EOF' /app/start.sh
+#!/bin/sh
+# Wait for database to be ready (longer initial wait)
+sleep 10
+
+# Generate Prisma client
+npx prisma generate
+
+# Run database migrations
+npx prisma migrate deploy
+
+# Start the application
+exec node server.js
+EOF
+
+RUN chmod +x /app/start.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -65,4 +94,4 @@ ENV PORT=3000
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+CMD ["/app/start.sh"]
