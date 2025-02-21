@@ -11,35 +11,35 @@ datasource db {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
-  name          String?
-  email         String?   @unique
-  password      String?
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  messages      Message[]
-  prompts       Prompt[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                Int                @id @default(autoincrement())
+  name              String?
+  email             String?            @unique
+  password          String?
+  emailVerified     DateTime?
+  image             String?
+  accounts          Account[]
+  sessions          Session[]
+  promptsContainers PromptsContainer[]
+  prompts           Prompt[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@map("users")
 }
 
 model Account {
-  id                 Int      @id @default(autoincrement())
-  userId             Int
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                Int     @id @default(autoincrement())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -59,18 +59,17 @@ model Session {
   @@map("sessions")
 }
 
-model Message {
+model PromptsContainer {
   id        Int      @id @default(autoincrement())
   content   String
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
-  promptId  Int?
-  prompt    Prompt?  @relation(fields: [promptId], references: [id])
+  prompts   Prompt[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
-  @@map("messages")
+  @@map("prompts_containers")
 }
 
 model AIModel {
@@ -80,22 +79,23 @@ model AIModel {
   prompts     Prompt[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
   @@map("ai_models")
 }
 
 model Prompt {
-  id        Int       @id @default(autoincrement())
-  messages   Message[]
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id])
-  modelId   Int
-  model     AIModel   @relation(fields: [modelId], references: [id])
-  isStarred Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                 Int              @id @default(autoincrement())
+  promptsContainerId Int
+  promptsContainer   PromptsContainer @relation(fields: [promptsContainerId], references: [id])
+  userId             Int
+  user               User             @relation(fields: [userId], references: [id])
+  modelId            Int
+  model              AIModel          @relation(fields: [modelId], references: [id])
+  isStarred          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   @@index([userId])
   @@index([modelId])
-
   @@map("prompts")
 }

@@ -33,7 +33,11 @@ const modelOptions: Record<string, ModelOption[]> = {
   ]
 }
 
-export function ModelOptions() {
+interface ModelOptionsProps {
+  className?: string;
+}
+
+export function ModelOptions({ className }: ModelOptionsProps) {
   const { selectedModel, setSelectedModel } = useLLMStore()
 
   const handleSelectModel = (model: string) => {
