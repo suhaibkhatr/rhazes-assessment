@@ -25,6 +25,10 @@ async function main() {
       {
         name: 'PaLM 2',
         description: 'Google\'s language model with strong multilingual capabilities'
+      },
+      {
+        name: 'Gemini Pro',
+        description: 'Google\'s advanced language model with real API integration'
       }
     ];
 

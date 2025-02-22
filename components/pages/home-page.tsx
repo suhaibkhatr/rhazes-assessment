@@ -86,7 +86,8 @@ function HomePage() {
 
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      const container = chatContainerRef.current;
+      container.scrollTop = container.scrollHeight;
     }
   };
 
@@ -129,7 +130,6 @@ function HomePage() {
     const currentInput = input;
     setInput('');
 
-
     try {
       // Create a new prompt in the database
       const promptResponse = await fetch(`/api/chat/${currentChat.id}/prompts`, {
@@ -148,52 +148,53 @@ function HomePage() {
       }
 
       const promptData = await promptResponse.json();
-      // Update the messages with the prompt ID immediately after receiving it
-
-      // Add user message immediately with model information
+      
+      // Update the messages with the prompt ID immediately
       const updatedMessages = [...currentChat.prompts, promptData];
       updateChat(currentChat.id, { ...currentChat, prompts: updatedMessages });
+      
+      // Ensure scroll after adding user message
+      scrollToBottom();
 
+      // Start streaming the response
+      const streamResponse = await fetch(
+        `/api/chat/${currentChat.id}/prompts/${promptData.id}/stream`,
+        { method: 'POST' }
+      );
+
+      if (!streamResponse.ok) throw new Error('Failed to stream response');
+
+      const reader = streamResponse.body?.getReader();
+      const decoder = new TextDecoder();
       let fullResponse = '';
 
-      for await (const chunk of simulateLLMStreaming(simulatedResponse, {
-        delayMs: 200,
-        chunkSize: 12,
-        stop: streamingOptions.current.stop,
-      })) {
-        if (streamingOptions.current.stop) break;
+      while (reader && !streamingOptions.current.stop) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
         fullResponse += chunk;
-        setCurrentResponse(fullResponse);
-        scrollToBottom();
+        
+        // Update the messages with the current chunk
+        const finalMessages = updatedMessages.map((msg, idx) =>
+          idx === updatedMessages.length - 1 
+            ? { ...msg, response: fullResponse } 
+            : msg
+        );
+        updateChat(currentChat.id, { ...currentChat, prompts: finalMessages });
+        
+        // Ensure scroll after each chunk
+        requestAnimationFrame(() => {
+          scrollToBottom();
+        });
       }
 
-      // Update the prompt with the AI response
-      const updatePromptResponse = await fetch(`/api/chat/${currentChat.id}/prompts/${promptData.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          response: fullResponse
-        })
-      });
-
-      if (!updatePromptResponse.ok) {
-        throw new Error('Failed to update prompt with answer');
-      }
-
-      // Update the last message with the AI response
-      const finalMessages = updatedMessages.map((msg, idx) =>
-        idx === updatedMessages.length - 1 ? { ...msg, response: fullResponse } : msg
-      );
-      updateChat(currentChat.id, { ...currentChat, prompts: finalMessages });
-
-      setCurrentResponse('');
     } catch (error) {
       console.error('Error handling message:', error);
-      // You might want to show an error message to the user here
+      // Handle error in UI
     } finally {
       setLoading(false);
+      // Final scroll to ensure everything is visible
       scrollToBottom();
     }
   };
