@@ -14,7 +14,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ chatI
         id: parseInt(promptId)
       },
       data: {
-        isStarred: isStarred
+        isStarred: isStarred,
+        starredAt: isStarred ? new Date() : null
       }
     });
 

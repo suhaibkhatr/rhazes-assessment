@@ -3,9 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Star, ArrowLeft, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Star, ArrowLeft, ChevronDown, ChevronUp, Trash2, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface StarredPrompt {
   id: string;
@@ -20,14 +27,20 @@ interface StarredPrompt {
     updatedAt: string;
   };
   createdAt: string;
+  starredAt: string;
 }
 
 export default function StarredPage() {
   const { data: session } = useSession();
   const [starredPrompts, setStarredPrompts] = useState<StarredPrompt[]>([]);
+  const [filteredPrompts, setFilteredPrompts] = useState<StarredPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
+  const [selectedModel, setSelectedModel] = useState<string>('all');
   const { toast } = useToast();
+
+  // Get unique models from prompts
+  const uniqueModels = Array.from(new Set(starredPrompts.map(prompt => prompt.model.name)));
 
   useEffect(() => {
     const fetchStarredPrompts = async () => {
@@ -36,6 +49,7 @@ export default function StarredPage() {
           const response = await fetch('/api/starred');
           const data = await response.json();
           setStarredPrompts(data);
+          setFilteredPrompts(data);
         } catch (error) {
           console.error('Error fetching starred prompts:', error);
         } finally {
@@ -46,6 +60,15 @@ export default function StarredPage() {
 
     fetchStarredPrompts();
   }, [session]);
+
+  // Filter prompts when model selection changes
+  useEffect(() => {
+    if (selectedModel === 'all') {
+      setFilteredPrompts(starredPrompts);
+    } else {
+      setFilteredPrompts(starredPrompts.filter(prompt => prompt.model.name === selectedModel));
+    }
+  }, [selectedModel, starredPrompts]);
 
   const togglePrompt = (promptId: string) => {
     setExpandedPrompts(prev => {
@@ -121,29 +144,65 @@ export default function StarredPage() {
             </Link>
             <h1 className="text-2xl font-bold">Starred Prompts</h1>
           </div>
-          <div className="text-sm text-gray-500">
-            {starredPrompts.length} {starredPrompts.length === 1 ? 'prompt' : 'prompts'} starred
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <Select
+                value={selectedModel}
+                onValueChange={setSelectedModel}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Models</SelectItem>
+                  {uniqueModels.map(model => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-sm text-gray-500">
+              {filteredPrompts.length} {filteredPrompts.length === 1 ? 'prompt' : 'prompts'} starred
+            </div>
           </div>
         </div>
 
-        {starredPrompts.length === 0 ? (
+        {filteredPrompts.length === 0 ? (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
             <Star className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-              No starred prompts yet
+              {selectedModel === 'all' 
+                ? 'No starred prompts yet'
+                : `No starred prompts for ${selectedModel}`
+              }
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Star your favorite prompts to access them quickly here
+              {selectedModel === 'all'
+                ? 'Star your favorite prompts to access them quickly here'
+                : 'Try selecting a different model or view all prompts'
+              }
             </p>
-            <Link href="/">
-              <Button variant="outline">
-                Return to Chat
+            {selectedModel === 'all' ? (
+              <Link href="/">
+                <Button variant="outline">
+                  Return to Chat
+                </Button>
+              </Link>
+            ) : (
+              <Button 
+                variant="outline"
+                onClick={() => setSelectedModel('all')}
+              >
+                View All Prompts
               </Button>
-            </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
-            {starredPrompts.map((prompt) => {
+            {filteredPrompts.map((prompt) => {
               const isExpanded = expandedPrompts.has(prompt.id);
               return (
                 <div 
@@ -180,7 +239,7 @@ export default function StarredPage() {
                         </span>
                         <div className="flex items-center gap-4">
                           <span className="text-sm text-gray-500">
-                            {new Date(prompt.createdAt).toLocaleDateString(undefined, {
+                            {new Date(prompt.starredAt).toLocaleDateString(undefined, {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric'

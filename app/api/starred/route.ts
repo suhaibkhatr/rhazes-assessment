@@ -37,7 +37,7 @@ export async function GET() {
                 model: true
             },
             orderBy: {
-                createdAt: 'desc'
+                starredAt: 'desc'
             }
         });
 
