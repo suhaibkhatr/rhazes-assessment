@@ -82,9 +82,9 @@ export default function StarredPage() {
     });
   };
 
-  const unstarPrompt = async (promptId: string, chatId: number) => {
+  const unstarPrompt = async (promptId: string) => {
     try {
-      const response = await fetch(`/api/chat/${chatId}/prompts/${promptId}/star`, {
+      const response = await fetch(`/api/prompt/${promptId}/star`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -213,7 +213,7 @@ export default function StarredPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        unstarPrompt(prompt.id, prompt.chatId);
+                        unstarPrompt(prompt.id);
                       }}
                       className="absolute right-4 top-4 p-2 rounded-full 
                         hover:bg-gray-100 dark:hover:bg-gray-700 

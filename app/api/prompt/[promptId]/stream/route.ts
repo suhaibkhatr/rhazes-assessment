@@ -5,7 +5,7 @@ import type { ModelName } from '@/helper/AImodels/model-interface';
 
 export async function POST(
     request: Request,
-    context: { params: Promise<{ chatId: string; promptId: string }> }
+    context: { params: Promise<{ promptId: string }> }
 ) {
     try {
         const session = await getServerSession();
@@ -14,12 +14,11 @@ export async function POST(
         }
 
         const params = await context.params;
-        const { chatId, promptId } = params;
+        const { promptId } = params;
 
         const prompt = await prisma.prompt.findUnique({
             where: { 
                 id: parseInt(promptId),
-                chatId: parseInt(chatId)
             }
         });
 
@@ -52,7 +51,6 @@ export async function POST(
                 console.error('Error generating response:', error);
                 await writer.write(encoder.encode('Error generating response'));
             } finally {
-                await writer.write(encoder.encode('[DONE]'));
                 await writer.close();
             }
         })();

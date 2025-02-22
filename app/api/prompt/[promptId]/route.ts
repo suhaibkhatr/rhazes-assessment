@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/primsa';
 import { getServerSession } from 'next-auth';
 
-export async function PATCH(request: Request, context: { params: Promise<{ chatId: string; promptId: string }> }) {
+export async function PATCH(request: Request, context: { params: Promise<{ promptId: string }> }) {
   try {
     // Await the params promise
     const params = await context.params;
-    const { chatId, promptId } = params;
+    const { promptId } = params;
 
     const session = await getServerSession();
 
@@ -25,23 +25,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ chatI
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Verify chat ownership
-    const chat = await prisma.chat.findFirst({
-      where: {
-        id: parseInt(chatId), // assuming chatId is a string and matches your schema type
-        userId: user.id,
-      },
-    });
-
-    if (!chat) {
-      return NextResponse.json({ error: 'Chat not found or unauthorized' }, { status: 404 });
-    }
-
     // Update the prompt
     const updatedPrompt = await prisma.prompt.update({
       where: {
         id: parseInt(promptId), // assuming promptId is a string
-        chatId: chat.id,
       },
       data: {
         ...(response !== undefined && { response }),

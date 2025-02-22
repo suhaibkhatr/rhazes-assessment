@@ -161,7 +161,7 @@ function HomePage() {
 
       // Start streaming the response
       const streamResponse = await fetch(
-        `/api/chat/${currentChat.id}/prompts/${promptData.id}/stream`,
+        `/api/prompt/${promptData.id}/stream`,
         { method: 'POST' }
       );
 
@@ -212,7 +212,7 @@ function HomePage() {
     if (chat) {
       const prompt = chat.prompts[messageIndex];
       try {
-        const response = await fetch(`/api/chat/${chatId}/prompts/${prompt.id}/star`, {
+        const response = await fetch(`/api/prompt/${prompt.id}/star`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'
