@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useRouter } from 'next/navigation';
 
 interface StarredPrompt {
   id: string;
@@ -25,7 +26,8 @@ interface StarredPrompt {
 }
 
 export default function StarredPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [starredPrompts, setStarredPrompts] = useState<StarredPrompt[]>([]);
   const [filteredPrompts, setFilteredPrompts] = useState<StarredPrompt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,8 +54,12 @@ export default function StarredPage() {
       }
     };
 
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+    
     fetchStarredPrompts();
-  }, [session]);
+  }, [session, status, router]);
 
   // Filter prompts when model selection changes
   useEffect(() => {
