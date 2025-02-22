@@ -1,0 +1,223 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
+import { Star, ArrowLeft, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
+
+interface StarredPrompt {
+  id: string;
+  prompt: string;
+  response: string;
+  chatId: number;
+  model: {
+    name: string;
+    description: string;
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  createdAt: string;
+}
+
+export default function StarredPage() {
+  const { data: session } = useSession();
+  const [starredPrompts, setStarredPrompts] = useState<StarredPrompt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchStarredPrompts = async () => {
+      if (session?.user?.email) {
+        try {
+          const response = await fetch('/api/starred');
+          const data = await response.json();
+          setStarredPrompts(data);
+        } catch (error) {
+          console.error('Error fetching starred prompts:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchStarredPrompts();
+  }, [session]);
+
+  const togglePrompt = (promptId: string) => {
+    setExpandedPrompts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(promptId)) {
+        newSet.delete(promptId);
+      } else {
+        newSet.add(promptId);
+      }
+      return newSet;
+    });
+  };
+
+  const unstarPrompt = async (promptId: string, chatId: number) => {
+    try {
+      const response = await fetch(`/api/chat/${chatId}/prompts/${promptId}/star`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          isStarred: false
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to unstar prompt');
+
+      // Remove the prompt from the local state
+      setStarredPrompts(prev => prev.filter(p => p.id !== promptId));
+
+      // Show success toast
+      toast({
+        title: "Prompt unstarred",
+        description: "The prompt has been removed from your starred collection",
+        variant: "default",
+        duration: 3000,
+      });
+
+    } catch (error) {
+      console.error('Error unstarring prompt:', error);
+      // Show error toast
+      toast({
+        title: "Error",
+        description: "Failed to unstar the prompt. Please try again.",
+        variant: "destructive",
+        duration: 4000,
+      });
+    }
+  };
+
+  const truncateText = (text: string, maxLength: number = 150) => {
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '...';
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold">Starred Prompts</h1>
+          </div>
+          <div className="text-sm text-gray-500">
+            {starredPrompts.length} {starredPrompts.length === 1 ? 'prompt' : 'prompts'} starred
+          </div>
+        </div>
+
+        {starredPrompts.length === 0 ? (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+            <Star className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              No starred prompts yet
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Star your favorite prompts to access them quickly here
+            </p>
+            <Link href="/">
+              <Button variant="outline">
+                Return to Chat
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {starredPrompts.map((prompt) => {
+              const isExpanded = expandedPrompts.has(prompt.id);
+              return (
+                <div 
+                  key={prompt.id} 
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow group"
+                >
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        unstarPrompt(prompt.id, prompt.chatId);
+                      }}
+                      className="absolute right-4 top-4 p-2 rounded-full 
+                        hover:bg-gray-100 dark:hover:bg-gray-700 
+                        opacity-0 group-hover:opacity-100 transition-opacity z-10
+                        border-2 border-yellow-400 hover:border-red-400
+                        bg-white dark:bg-gray-800
+                        shadow-sm hover:shadow-md
+                        transform hover:scale-105 transition-all duration-200"
+                      title="Unstar prompt"
+                    >
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 
+                        hover:text-red-400 hover:fill-red-400 transition-colors" 
+                      />
+                    </button>
+
+                    <button
+                      onClick={() => togglePrompt(prompt.id)}
+                      className="w-full text-left p-6"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+                          {prompt.model.name}
+                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-500">
+                            {new Date(prompt.createdAt).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="h-5 w-5 text-gray-500" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-gray-500" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Input</h3>
+                          <p className="text-gray-900 dark:text-gray-100">
+                            {isExpanded ? prompt.prompt : truncateText(prompt.prompt)}
+                          </p>
+                        </div>
+                        {isExpanded && (
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Response</h3>
+                            <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                              {prompt.response}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+} 
