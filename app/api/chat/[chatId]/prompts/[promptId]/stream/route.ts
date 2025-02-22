@@ -1,12 +1,7 @@
 import prisma from '@/lib/primsa';
 import { getServerSession } from 'next-auth';
-import { simulateLLMStreaming } from '@/lib/generator';
-import { simulatedResponse } from '@/helper/helper';
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+import { ModelFactory } from '@/helper/AImodels/model-factory';
+import type { ModelName } from '@/helper/AImodels/model-interface';
 
 export async function POST(
     request: Request,
@@ -40,43 +35,24 @@ export async function POST(
         // Start processing in the background
         (async () => {
             try {
-                if (prompt.modelName === 'Gemini Pro') {
-                    // Use Gemini's streaming capability
-                    const result = await geminiModel.generateContentStream(prompt.prompt);
-                    let fullResponse = '';
-
-                    for await (const chunk of result.stream) {
-                        const chunkText = chunk.text();
-                        fullResponse += chunkText;
-                        await writer.write(encoder.encode(chunkText));
-                    }
-
-                    // Update the prompt with the complete response
-                    await prisma.prompt.update({
-                        where: { id: prompt.id },
-                        data: { response: fullResponse }
-                    });
-                } else {
-                    // Use simulated streaming for other models
-                    let fullResponse = '';
-                    for await (const chunk of simulateLLMStreaming(simulatedResponse, {
-                        delayMs: 100,
-                        chunkSize: 10,
-                    })) {
-                        fullResponse += chunk;
-                        await writer.write(encoder.encode(chunk));
-                    }
+                const model = ModelFactory.createModel(prompt.modelName as ModelName);
+                
+                for await (const { text, fullResponse } of model.generateStream(prompt.prompt)) {
+                    await writer.write(encoder.encode(text));
                     
-                    // Update the prompt with the full response
-                    await prisma.prompt.update({
-                        where: { id: prompt.id },
-                        data: { response: fullResponse }
-                    });
+                    // Update the prompt with the complete response after the last chunk
+                    if (fullResponse) {
+                        await prisma.prompt.update({
+                            where: { id: prompt.id },
+                            data: { response: fullResponse }
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error generating response:', error);
                 await writer.write(encoder.encode('Error generating response'));
             } finally {
+                await writer.write(encoder.encode('[DONE]'));
                 await writer.close();
             }
         })();
