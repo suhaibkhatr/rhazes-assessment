@@ -29,14 +29,10 @@ export async function GET() {
         const chatHistory = await prisma.chat.findMany({
             where: { userId: user.id },
             include: {
-                prompts: {
-                    include: {
-                        model: true
-                    }
-                }
+                prompts: true
             },
             orderBy: {
-                createdAt: 'asc'
+                createdAt: 'desc'
             }
         });
 

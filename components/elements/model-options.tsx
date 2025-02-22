@@ -18,17 +18,6 @@ interface ModelOption {
   description: string;
 }
 
-interface ModelOptionsResponse {
-  id: number;
-  name: string;
-  description: string;
-}
-
-
-interface AIModel {
-  id: number
-  model: string
-}
 
 export function ModelOptions() {
   const { selectedModel, setSelectedModel } = useLLMStore()
@@ -36,31 +25,49 @@ export function ModelOptions() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
+  const models = [
+    {
+      id: 1,
+      name: 'GPT-4',
+      description: 'Most capable GPT model, particularly good at tasks that require creativity and advanced reasoning'
+    },
+    {
+      id: 2,
+      name: 'GPT-3.5 Turbo',
+      description: 'Fast and efficient model for most chat and text generation tasks'
+    },
+    {
+      id: 3,
+      name: 'Claude 2',
+      description: 'Advanced AI model with strong capabilities in analysis and technical content'
+    },
+    {
+      id: 4,
+      name: 'DALL-E 3',
+      description: 'Specialized in creating and editing images from natural language descriptions'
+    },
+    {
+      id: 5,
+      name: 'PaLM 2',
+      description: 'Google\'s language model with strong multilingual capabilities'
+    },
+    {
+      id: 6,
+      name: 'Gemini Pro',
+      description: 'Google\'s advanced language model with real API integration'
+    }
+  ]
+  
   // Fetch models from the database
   React.useEffect(() => {
     const fetchModels = async () => {
       try {
-        const response = await fetch('/api/models')
-        if (!response.ok) throw new Error('Failed to fetch models')
-
-        const data: ModelOptionsResponse[] = await response.json()
-
-        // Transform the data into ModelOption array
-        const models = data.map(model => ({
-          id: model.id,
-          name: model.name,
-          description: model.description,
-        }))
-
         setModelOptions(models)
         setIsLoading(false)
 
         // Set default model if none is selected
         if (models.length > 0) {
-          setSelectedModel({
-            id: models[0].id,
-            model: models[0].name,
-          })
+          setSelectedModel(models[0].name)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch models')
@@ -71,7 +78,7 @@ export function ModelOptions() {
     fetchModels()
   }, [setSelectedModel])
 
-  const handleSelectModel = (model: AIModel) => {
+  const handleSelectModel = (model: string) => {
     setSelectedModel(model)
   }
 
@@ -95,7 +102,7 @@ export function ModelOptions() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="min-w-[140px]">
-          {selectedModel.model || 'Select Model'}
+          {selectedModel || 'Select Model'}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64">
@@ -105,7 +112,7 @@ export function ModelOptions() {
           {modelOptions.map((model) => (
             <DropdownMenuItem
               key={model.name}
-              onSelect={() => handleSelectModel({ id: model.id, model: model.name })}
+              onSelect={() => handleSelectModel(model.name)}
               className="flex flex-col items-start"
             >
               <span className="font-medium">{model.name}</span>

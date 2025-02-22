@@ -18,7 +18,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
             );
         }
 
-        const { user_input, model } = await request.json();
+        const { user_input, modelName } = await request.json();
 
         // Get user ID from email
         const user = await prisma.user.findUnique({
@@ -54,7 +54,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
                 response: '',
                 isStarred: false,
                 chatId: chat.id,
-                modelId: model.id
+                modelName: modelName
             }
         });
 

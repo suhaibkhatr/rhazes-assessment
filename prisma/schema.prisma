@@ -75,7 +75,6 @@ model AIModel {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
-  prompts     Prompt[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -86,8 +85,7 @@ model Prompt {
   id               Int       @id @default(autoincrement())
   chatId           Int
   promptsContainer Chat      @relation(fields: [chatId], references: [id])
-  modelId          Int
-  model            AIModel   @relation(fields: [modelId], references: [id])
+  modelName        String    @default("GPT-4")
   isStarred        Boolean   @default(false)
   starredAt        DateTime?
   createdAt        DateTime  @default(now())
@@ -95,7 +93,6 @@ model Prompt {
   prompt           String
   response         String
 
-  @@index([modelId])
   @@index([chatId])
   @@map("prompts")
 }

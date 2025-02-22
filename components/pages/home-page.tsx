@@ -76,6 +76,7 @@ function HomePage() {
         if (formattedChats.length > 0) {
           setActiveChat(formattedChats[0]);
         }
+        scrollToBottom();
       } catch (error) {
         console.error('Error loading chat history:', error);
       }
@@ -141,7 +142,7 @@ function HomePage() {
         },
         body: JSON.stringify({
           user_input: currentInput,
-          model: model
+          modelName: model
         })
       });
 
@@ -353,7 +354,7 @@ function HomePage() {
                           <Markdown className="prose dark:prose-invert prose-sm max-w-none break-words">
                             {message.prompt}
                           </Markdown>
-                          {message.modelId && (
+                          {message.modelName && (
                             <div className="mt-2 text-xs opacity-70 border-t border-white/20 pt-2">
                               Using: {message.modelName || `Model ${message.modelId}`}
                             </div>

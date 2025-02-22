@@ -19,13 +19,7 @@ interface StarredPrompt {
   prompt: string;
   response: string;
   chatId: number;
-  model: {
-    name: string;
-    description: string;
-    id: string;
-    createdAt: string;
-    updatedAt: string;
-  };
+  modelName: string;
   createdAt: string;
   starredAt: string;
 }
@@ -40,7 +34,7 @@ export default function StarredPage() {
   const { toast } = useToast();
 
   // Get unique models from prompts
-  const uniqueModels = Array.from(new Set(starredPrompts.map(prompt => prompt.model.name)));
+  const uniqueModels = Array.from(new Set(starredPrompts.map(prompt => prompt.modelName)));
 
   useEffect(() => {
     const fetchStarredPrompts = async () => {
@@ -66,7 +60,7 @@ export default function StarredPage() {
     if (selectedModel === 'all') {
       setFilteredPrompts(starredPrompts);
     } else {
-      setFilteredPrompts(starredPrompts.filter(prompt => prompt.model.name === selectedModel));
+      setFilteredPrompts(starredPrompts.filter(prompt => prompt.modelName === selectedModel));
     }
   }, [selectedModel, starredPrompts]);
 
@@ -235,7 +229,7 @@ export default function StarredPage() {
                     >
                       <div className="flex items-center justify-between mb-4">
                         <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
-                          {prompt.model.name}
+                          {prompt.modelName}
                         </span>
                         <div className="flex items-center gap-4">
                           <span className="text-sm text-gray-500">

@@ -25,8 +25,7 @@ export async function POST(
             where: { 
                 id: parseInt(promptId),
                 chatId: parseInt(chatId)
-            },
-            include: { model: true }
+            }
         });
 
         if (!prompt) {
@@ -41,7 +40,7 @@ export async function POST(
         // Start processing in the background
         (async () => {
             try {
-                if (prompt.model.name === 'Gemini Pro') {
+                if (prompt.modelName === 'Gemini Pro') {
                     // Use Gemini's streaming capability
                     const result = await geminiModel.generateContentStream(prompt.prompt);
                     let fullResponse = '';

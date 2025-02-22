@@ -33,9 +33,6 @@ export async function GET() {
                 isStarred: true,
                 chatId: { in: chats.map((chat) => chat.id) }
             },
-            include: {
-                model: true
-            },
             orderBy: {
                 starredAt: 'desc'
             }

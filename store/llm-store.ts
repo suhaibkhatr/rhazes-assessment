@@ -1,21 +1,11 @@
 import { create } from 'zustand'
 
-interface AIModel {
-    id: number
-    model: string
-}
 interface LLMStore {
-    selectedModel: {
-        id: number
-        model: string
-    }
-    setSelectedModel: (model: AIModel) => void
+    selectedModel: string
+    setSelectedModel: (model: string) => void
 }
 
 export const useLLMStore = create<LLMStore>((set) => ({
-    selectedModel: {
-        id: 0,
-        model: '',
-    },
+    selectedModel: "GPT-4",
     setSelectedModel: (model) => set({ selectedModel: model }),
 }))
