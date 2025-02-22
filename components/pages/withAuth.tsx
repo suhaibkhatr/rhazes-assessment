@@ -1,13 +1,14 @@
-// filepath: /Users/suhaibkhater/Downloads/tech-assessment-main/components/withAuth.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ReactNode, useEffect } from "react";
+import { useEffect } from "react";
 
-const withAuth = (WrappedComponent: React.ComponentType) => {
-  return (props: any) => {
-    const { data: session, status } = useSession();
+const withAuth = <P extends object>(
+  WrappedComponent: React.ComponentType<P>
+) => {
+  const WithAuthComponent = (props: P) => {
+    const { status } = useSession();
     const router = useRouter();
 
     useEffect(() => {
@@ -26,6 +27,12 @@ const withAuth = (WrappedComponent: React.ComponentType) => {
 
     return null;
   };
+
+  const wrappedComponentName =
+    WrappedComponent.displayName || WrappedComponent.name || "Component";
+  WithAuthComponent.displayName = `withAuth(${wrappedComponentName})`;
+
+  return WithAuthComponent;
 };
 
 export default withAuth;

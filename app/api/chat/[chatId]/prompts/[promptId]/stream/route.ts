@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import prisma from '@/lib/primsa';
 import { getServerSession } from 'next-auth';
 import { simulateLLMStreaming } from '@/lib/generator';
@@ -11,7 +10,7 @@ const geminiModel = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 export async function POST(
     request: Request,
-    { params }: { params: { chatId: string; promptId: string } }
+    context: { params: Promise<{ chatId: string; promptId: string }> }
 ) {
     try {
         const session = await getServerSession();
@@ -19,8 +18,14 @@ export async function POST(
             return new Response('Unauthorized', { status: 401 });
         }
 
+        const params = await context.params;
+        const { chatId, promptId } = params;
+
         const prompt = await prisma.prompt.findUnique({
-            where: { id: parseInt(params.promptId) },
+            where: { 
+                id: parseInt(promptId),
+                chatId: parseInt(chatId)
+            },
             include: { model: true }
         });
 

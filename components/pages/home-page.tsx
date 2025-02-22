@@ -2,29 +2,31 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { ModeToggle } from '../elements/toggle-mode';
-import { simulateLLMStreaming } from '@/lib/generator';
-import { CircleSlash, LogOut, MessageSquare, Smile, Send, Bot, Star } from 'lucide-react';
+import { CircleSlash, LogOut, MessageSquare, Send, Bot, Star } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ModelOptions } from '../elements/model-options';
 import Markdown from "react-markdown";
 import { useLLMStore } from '@/store/llm-store';
-import { simulatedResponse } from '@/helper/helper';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from "next-auth/react";
 import Link from 'next/link';
 
+
+interface Prompt {
+  id: number;
+  prompt: string;
+  response: string;
+  isStarred: boolean;
+  model: string;
+  modelId: number;
+  chatId: number;
+  modelName: string;
+}
+
 interface Chat {
   id: number;
-  name: string;
-  prompts: {
-    id: number;
-    prompt: string;
-    response: string;
-    isStarred?: boolean;
-    modelId?: number;
-    modelName?: string;
-    chatId: number;
-  }[];
+  title: string;
+  prompts: Prompt[];
 }
 
 function HomePage() {
@@ -43,7 +45,6 @@ function HomePage() {
   const [currentResponse, setCurrentResponse] = useState<string>('');
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [isTyping, setIsTyping] = useState<boolean>(false);
   const streamingOptions = useRef<{ stop: boolean }>({ stop: false });
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -57,16 +58,17 @@ function HomePage() {
         if (!response.ok) throw new Error('Failed to fetch chat history');
 
         const data = await response.json();
-        const formattedChats: Chat[] = data.map((container: any) => ({
+        const formattedChats: Chat[] = data.map((container: Chat) => ({
           id: container.id,
-          name: container.title,
-          prompts: container.prompts.map((msg: any) => ({
+          title: container.title,
+          prompts: container.prompts.map((msg: Prompt) => ({
             id: msg.id,
             prompt: msg.prompt,
             response: msg.response,
             isStarred: msg.isStarred,
             model: msg.model,
             modelId: msg.modelId,
+            modelName: msg.modelName
           }))
         }));
 
@@ -114,7 +116,7 @@ function HomePage() {
         const newChatData = await response.json();
         const newChat: Chat = {
           id: newChatData.id,
-          name: newChatData.title,
+          title: newChatData.title,
           prompts: []
         };
 
@@ -251,7 +253,7 @@ function HomePage() {
       const newChatData = await response.json();
       const newChat: Chat = {
         id: newChatData.id,
-        name: newChatData.title,
+        title: newChatData.title,
         prompts: []
       };
 
@@ -297,7 +299,7 @@ function HomePage() {
                     : 'hover:bg-[#2A2B32]'}`}
               >
                 <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <div className="truncate text-sm">{chat.name}</div>
+                <div className="truncate text-sm">{chat.title}</div>
               </button>
             ))}
           </div>
@@ -379,7 +381,7 @@ function HomePage() {
                       <div className="w-8 h-8 rounded-full bg-emerald-500 flex-shrink-0 shadow-sm border-2 border-white dark:border-gray-800" />
                       <div className="min-w-0 group">
                         <div className="bg-gray-100 dark:bg-gray-700/80 px-6 py-4 rounded-2xl shadow-sm backdrop-blur-sm transform transition-all duration-300 hover:shadow-md hover:scale-[1.01] relative">
-                          {isTyping && index === activeChat.prompts.length - 1 && (
+                          {loading && index === activeChat.prompts.length - 1 && (
                             <div className="absolute -bottom-6 left-0 flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
                               <span className="animate-bounce">●</span>
                               <span className="animate-bounce delay-100">●</span>
@@ -417,7 +419,7 @@ function HomePage() {
                 onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
                 className="flex items-end gap-3 relative"
               >
-                <ModelOptions className="flex-none" />
+                <ModelOptions />
                 <div className="relative flex-1">
                   <Input
                     placeholder="Message ChatGPT..."

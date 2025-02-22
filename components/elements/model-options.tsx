@@ -24,16 +24,13 @@ interface ModelOptionsResponse {
   description: string;
 }
 
-interface ModelOptionsProps {
-  className?: string;
-}
 
 interface AIModel {
   id: number
   model: string
 }
 
-export function ModelOptions({ className }: ModelOptionsProps) {
+export function ModelOptions() {
   const { selectedModel, setSelectedModel } = useLLMStore()
   const [modelOptions, setModelOptions] = React.useState<ModelOption[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -72,7 +69,7 @@ export function ModelOptions({ className }: ModelOptionsProps) {
     }
 
     fetchModels()
-  }, [])
+  }, [setSelectedModel])
 
   const handleSelectModel = (model: AIModel) => {
     setSelectedModel(model)

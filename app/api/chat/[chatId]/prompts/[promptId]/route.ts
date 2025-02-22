@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/primsa';
 import { getServerSession } from 'next-auth';
 
-export async function PATCH(request: Request, context: { params: Promise<{ chatId: number; promptId: number }> }) {
+export async function PATCH(request: Request, context: { params: Promise<{ chatId: string; promptId: string }> }) {
   try {
     // Await the params promise
     const params = await context.params;

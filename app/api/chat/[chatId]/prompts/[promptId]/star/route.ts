@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma  from '@/lib/primsa';
 
-export async function PATCH(request: Request, context: { params: Promise<{ chatId: number; promptId: number }> }) {
+export async function PATCH(request: Request, context: { params: Promise<{ chatId: string; promptId: string }> }) {
   try {
     // Await the params promise
     const params = await context.params;
@@ -11,7 +11,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ chatI
     // Toggle the isStarred status
     const updatedPrompt = await prisma.prompt.update({
       where: {
-        id: parseInt(promptId)
+        id: parseInt(promptId),
+        chatId: parseInt(chatId)
       },
       data: {
         isStarred: isStarred,
