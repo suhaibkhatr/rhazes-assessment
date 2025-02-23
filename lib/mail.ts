@@ -1,8 +1,5 @@
 import { EmailClient } from "@azure/communication-email";
 
-const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING as string;
-const emailClient = new EmailClient(connectionString);
-
 interface EmailProps {
   to: string;
   subject: string;
@@ -11,6 +8,16 @@ interface EmailProps {
 
 export async function sendEmail({ to, subject, html }: EmailProps) {
   try {
+    if (!process.env.AZURE_SENDER_EMAIL) {
+      throw new Error('AZURE_SENDER_EMAIL is not set');
+    }
+
+    if (!process.env.AZURE_COMMUNICATION_CONNECTION_STRING) {
+      throw new Error('AZURE_COMMUNICATION_CONNECTION_STRING is not set');
+    }
+
+    const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING as string;
+    const emailClient = new EmailClient(connectionString);
     const message = {
       senderAddress: process.env.AZURE_SENDER_EMAIL as string,
       content: {
