@@ -6,6 +6,7 @@ import { ModeToggle } from "@/components/elements/toggle-mode";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, UserPlus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -75,8 +77,18 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Registration failed');
       }
 
-      // Registration successful
-      router.push('/login');
+      // Add success toast
+      toast({
+        title: "Registration successful!",
+        description: "Please check your email for verification instructions.",
+        duration: 5000,
+      });
+
+      // Optional: Redirect to login page after a delay
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
+
     } catch (error) {
       setError('An error occurred during registration');
     } finally {
