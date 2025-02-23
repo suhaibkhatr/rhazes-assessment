@@ -32,9 +32,23 @@ export async function POST(req: Request) {
       );
     }
 
+    if(!process.env.JWT_SECRET) {
+      return NextResponse.json(
+        { error: 'JWT_SECRET is not set' },
+        { status: 500 }
+      );
+    }
+    
+    if(!process.env.NEXTAUTH_URL) {
+      return NextResponse.json(
+        { error: 'NEXTAUTH_URL is not set' },
+        { status: 500 }
+      );
+    }
+
     // Generate a new verification token
     const token = jwt.sign({ email }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
-    const verifyLink = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify-email?token=${token}`;
+    const verifyLink = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${token}`;
 
     // Send verification email
     await sendEmail({
@@ -49,7 +63,6 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Resend verification error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

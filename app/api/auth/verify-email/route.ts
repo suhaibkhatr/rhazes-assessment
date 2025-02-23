@@ -15,17 +15,36 @@ export async function GET(request: Request) {
     }
 
     try {
+      if(!process.env.JWT_SECRET) {
+        return NextResponse.json(
+          { error: 'JWT_SECRET is not set' },
+          { status: 500 }
+        );
+      }
       // Verify the token
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { email: string };
 
+      if(!decoded.email) {
+        return NextResponse.json(
+          { error: 'Invalid token' },
+          { status: 400 }
+        );
+      }
+      
       // Update user's email verification status
       await prisma.user.update({
         where: { email: decoded.email },
         data: { emailVerified: new Date() },
       });
 
+      if(!process.env.NEXTAUTH_URL) {
+        return NextResponse.json(
+          { error: 'NEXTAUTH_URL is not set' },
+          { status: 500 }
+        );
+      }
       // Redirect to success page
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_API_URL}/auth/email-verified`);
+      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/auth/email-verified`);
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         return NextResponse.json(
@@ -39,7 +58,6 @@ export async function GET(request: Request) {
       );
     }
   } catch (error) {
-    console.error('Email verification error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

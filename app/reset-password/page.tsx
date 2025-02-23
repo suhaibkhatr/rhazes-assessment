@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -8,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/elements/toggle-mode';
 import { Loader2, Lock } from 'lucide-react';
 
-export default function ResetPassword() {
+// Separate component that uses useSearchParams
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [passwords, setPasswords] = useState({
@@ -196,5 +198,14 @@ export default function ResetPassword() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function ResetPassword() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

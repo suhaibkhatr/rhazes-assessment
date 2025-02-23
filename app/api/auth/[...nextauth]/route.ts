@@ -4,7 +4,6 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/primsa";
 import bcrypt from 'bcryptjs';
-import { AuthOptions } from 'next-auth';
 
 interface User {
   id: string;
@@ -12,49 +11,39 @@ interface User {
   email: string | null;
 }
 
-export const authOptions: AuthOptions = {
+const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     CredentialsProvider({
       name: "Email Login",
       credentials: {
-        email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" },
+        email: { label: "Email", type: "email", placeholder: "name@example.com" },
+        password: { label: "Password", type: "password" }
       },
       async authorize(credentials): Promise<User | null> {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password required");
+          throw new Error("Please enter both email and password");
         }
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
 
-        if (!user) {
-          throw new Error("Email does not exist");
+        if (!user || !user.password) {
+          throw new Error("Invalid email or password");
         }
 
-        if (!user.password) {
-          throw new Error("Please log in with your social account");
-        }
-
-        // Check if email is verified
-        if (!user.emailVerified) {
-          throw new Error("Please verify your email before logging in");
-        }
-
-        const isCorrectPassword = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isCorrectPassword) {
-          throw new Error("Incorrect password");
+        const isMatch = await bcrypt.compare(credentials.password, user.password);
+        if (!isMatch) {
+          throw new Error("Invalid email or password");
         }
 
         return {
-          id: user.id.toString(),
+          id: String(user.id), // Convert the id to a string
           name: user.name || "",
           email: user.email || "",
         };
@@ -84,26 +73,8 @@ export const authOptions: AuthOptions = {
       }
       return session;
     },
-    async signIn({ user, account }) {
-      // Allow OAuth login without email verification
-      if (account?.provider !== 'credentials') {
-        return true;
-      }
-
-      // For credentials provider, check email verification
-      const dbUser = await prisma.user.findUnique({
-        where: { email: user.email! },
-      });
-
-      if (!dbUser?.emailVerified) {
-        throw new Error("Please verify your email before logging in");
-      }
-
-      return true;
-    },
   },
   secret: process.env.NEXTAUTH_SECRET || "test-secret",
-};
+});
 
-const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };

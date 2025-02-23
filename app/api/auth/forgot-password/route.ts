@@ -7,6 +7,13 @@ export async function POST(req: Request) {
   try {
     const { email } = await req.json();
     
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Email is required' },
+        { status: 400 }
+      );
+    }
+    
     const user = await prisma.user.findUnique({
       where: { email }
     });
@@ -18,11 +25,25 @@ export async function POST(req: Request) {
       );
     }
 
+    if(!process.env.JWT_SECRET) {
+      return NextResponse.json(
+        { error: 'JWT_SECRET is not set' },
+        { status: 500 }
+      );
+    }
+
     const resetToken = jwt.sign(
       { email },
       process.env.JWT_SECRET as string,
       { expiresIn: '1h' }
     );
+
+    if(!process.env.NEXTAUTH_URL) {
+      return NextResponse.json(
+        { error: 'NEXTAUTH_URL is not set' },
+        { status: 500 }
+      );
+    }
 
     const resetLink = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
     

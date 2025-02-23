@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error verifying reset token:', error);
     return NextResponse.json(
       { error: 'Something went wrong' },
       { status: 500 }
