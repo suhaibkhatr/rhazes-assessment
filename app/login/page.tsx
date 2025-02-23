@@ -17,7 +17,8 @@ export default function LoginPage() {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -34,42 +35,53 @@ export default function LoginPage() {
     setError(''); // Clear error when user types
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
+
+    const formData = new FormData(e.currentTarget);
     
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
     try {
-      const result = await signIn("credentials", {
-        email: formData.email,
-        password: formData.password,
+      const res = await signIn('credentials', {
+        email: formData.get('email'),
+        password: formData.get('password'),
         redirect: false,
-        callbackUrl: "/"
       });
 
-      if (result?.error) {
-        setError(result.error);
-      } else if (result?.ok) {
-        router.push("/");
+      if (res?.error) {
+        setError(res.error);
+        setFormData(prev => ({
+          ...prev,
+          email: formData.get('email') as string
+        }));
+      } else {
+        router.push('/');
       }
     } catch (error) {
-      console.error("Login error:", error);
       setError('An error occurred during login');
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.error);
+      } else {
+        setError('Verification email sent. Please check your inbox.');
+      }
+    } catch (error) {
+      setError('Failed to resend verification email');
     } finally {
-      setIsLoading(false);
+      setIsResendingVerification(false);
     }
   };
 
@@ -88,11 +100,21 @@ export default function LoginPage() {
             {error && (
               <div className="p-4 text-sm text-red-500 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800 transition-all duration-200">
                 {error}
+                {error.includes('verify your email') && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={isResendingVerification}
+                    className="ml-2 text-blue-500 hover:text-blue-700 underline"
+                  >
+                    {isResendingVerification ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                )}
               </div>
             )}
             
             {/* Test Account Login */}
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <Input
                 type="email"
                 name="email"

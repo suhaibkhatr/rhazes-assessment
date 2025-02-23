@@ -1,46 +1,38 @@
 import { NextResponse } from 'next/server';
-import { hash } from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import prisma from '@/lib/primsa';
 import { sendEmail } from '@/lib/mail';
-import jwt from 'jsonwebtoken';
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password } = await req.json();
+    const { email } = await req.json();
 
-    // Validate input
-    if (!name || !email || !password) {
+    if (!email) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Email is required' },
         { status: 400 }
       );
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
     });
 
-    if (existingUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'User already exists' },
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    if (user.emailVerified) {
+      return NextResponse.json(
+        { error: 'Email is already verified' },
         { status: 400 }
       );
     }
 
-    // Hash password
-    const hashedPassword = await hash(password, 12);
-
-    // Create user
-    await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
-    });
-
-    // Generate a verification token valid for 1 hour
+    // Generate a new verification token
     const token = jwt.sign({ email }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
     const verifyLink = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify-email?token=${token}`;
 
@@ -53,14 +45,14 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(
-      { message: 'User registered. Check your email to verify your account.' },
-      { status: 201 }
+      { message: 'Verification email sent' },
+      { status: 200 }
     );
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Resend verification error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
-}
+} 
