@@ -8,6 +8,13 @@ export default {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
+  	container: {
+  		center: true,
+  		padding: "2rem",
+  		screens: {
+  			"2xl": "1400px",
+  		},
+  	},
   	extend: {
   		colors: {
   			background: 'hsl(var(--background))',
@@ -56,7 +63,25 @@ export default {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
-		
+  		keyframes: {
+  			"slide-up": {
+  				'0%': { transform: 'translateY(100%)' },
+  				'100%': { transform: 'translateY(0)' },
+  			},
+  			"accordion-down": {
+  				from: { height: '0' },
+  				to: { height: "var(--radix-accordion-content-height)" },
+  			},
+  			"accordion-up": {
+  				from: { height: "var(--radix-accordion-content-height)" },
+  				to: { height: '0' },
+  			},
+  		},
+  		animation: {
+  			"slide-up": 'slide-up 0.3s ease-out',
+  			"accordion-down": "accordion-down 0.2s ease-out",
+  			"accordion-up": "accordion-up 0.2s ease-out",
+  		},
   	}
   },
   // eslint-disable-next-line @typescript-eslint/no-require-imports

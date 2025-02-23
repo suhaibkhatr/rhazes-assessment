@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { ModeToggle } from '../elements/toggle-mode';
-import { CircleSlash, LogOut, MessageSquare, Send, Bot, Star } from 'lucide-react';
+import { CircleSlash, LogOut, MessageSquare, Send, Bot, Star, Menu, Settings } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ModelOptions } from '../elements/model-options';
 import Markdown from "react-markdown";
@@ -47,6 +47,8 @@ function HomePage() {
   const [loading, setLoading] = useState<boolean>(false);
   const streamingOptions = useRef<{ stop: boolean }>({ stop: false });
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
 
   const model = useLLMStore().selectedModel;
 
@@ -87,12 +89,25 @@ function HomePage() {
     }
   }, [status]);
 
+  // Update the scrollToBottom function to be more reliable
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
-      const container = chatContainerRef.current;
-      container.scrollTop = container.scrollHeight;
+      // Use requestAnimationFrame to ensure the scroll happens after render
+      requestAnimationFrame(() => {
+        chatContainerRef.current?.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      });
     }
   };
+
+  // Add useEffect to scroll when activeChat changes
+  useEffect(() => {
+    if (activeChat) {
+      scrollToBottom();
+    }
+  }, [activeChat]);
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
@@ -272,41 +287,70 @@ function HomePage() {
     setLoading(false);
   };
 
+  // Update the chat selection handler
+  const handleChatSelect = (chat: Chat) => {
+    setActiveChat(chat);
+    setIsSidebarOpen(false); // Close sidebar on mobile after selection
+    scrollToBottom(); // Scroll to bottom when selecting a chat
+  };
+
   if (status === "loading") return <div>Loading...</div>;
   if (!session) return null;
 
   return (
     <div className="flex flex-col h-screen">
       <div className="flex h-[100dvh]">
-        {/* Left sidebar - always dark */}
-        <div className="flex-none w-[260px] bg-[#202123] text-white p-2">
-          <Button
-            onClick={createNewChat}
-            className="w-full mb-4 flex items-center gap-3 border border-white/20 hover:bg-[#2A2B32]"
-            variant="ghost"
-          >
-            <MessageSquare className="h-4 w-4" />
-            New Chat
-          </Button>
+        {/* Overlay for mobile sidebar */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
 
-          <div className="space-y-2 overflow-y-auto">
-            {chats.map((chat) => (
-              <button
-                key={chat.id}
-                onClick={() => setActiveChat(chat)}
-                className={`w-full text-left p-3 rounded transition-colors flex items-center gap-3
-                  ${activeChat?.id === chat.id
-                    ? 'bg-[#343541] hover:bg-[#343541]'
-                    : 'hover:bg-[#2A2B32]'}`}
-              >
-                <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <div className="truncate text-sm">{chat.title}</div>
-              </button>
-            ))}
+        {/* Left sidebar - always dark */}
+        <div className={`fixed md:relative flex-none w-[260px] bg-[#202123] text-white h-full transition-all duration-300 transform z-50 
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+          md:translate-x-0 md:w-[260px]
+          flex flex-col`}
+        >
+          {/* Close button for mobile */}
+          <button 
+            className="absolute top-2 right-2 p-2 hover:bg-[#2A2B32] rounded-full md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <CircleSlash className="h-4 w-4" />
+          </button>
+
+          <div className="flex-1 flex flex-col p-2">
+            <Button
+              onClick={createNewChat}
+              className="w-full mb-4 flex items-center gap-3 border border-white/20 hover:bg-[#2A2B32]"
+              variant="ghost"
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span>New Chat</span>
+            </Button>
+
+            <div className="flex-1 space-y-2 overflow-y-auto">
+              {chats.map((chat) => (
+                <button
+                  key={chat.id}
+                  onClick={() => handleChatSelect(chat)}
+                  className={`w-full text-left p-3 rounded transition-colors flex items-center gap-3
+                    ${activeChat?.id === chat.id
+                      ? 'bg-[#343541] hover:bg-[#343541]'
+                      : 'hover:bg-[#2A2B32]'}`}
+                >
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                  <div className="truncate text-sm">{chat.title}</div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Bottom section with user info */}
-          <div className="absolute bottom-0 left-0 w-[260px] p-2 border-t border-white/20">
+          <div className="p-2 border-t border-white/20">
             <Button
               onClick={() => signOut({ callbackUrl: "/login" })}
               variant="ghost"
@@ -320,21 +364,34 @@ function HomePage() {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col bg-white dark:bg-gray-800">
-          {/* Header - only dark mode toggle */}
-          <div className="border-b border-gray-200 dark:border-gray-700/50 p-2 flex justify-end gap-2 items-center bg-white dark:bg-gray-800">
-            <Link 
-              href="/starred" 
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Star className="h-4 w-4" />
-              <span className="text-sm">Starred Prompts</span>
-            </Link>
-            <ModeToggle />
+          {/* Header - dark mode toggle and sidebar toggle */}
+          <div className="border-b border-gray-200 dark:border-gray-700/50 p-2 flex justify-between items-center bg-white dark:bg-gray-800 sticky top-0 z-10">
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                variant="ghost"
+                size="icon"
+                className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-700"
+                title={isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link 
+                href="/starred" 
+                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Star className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm">Starred Prompts</span>
+              </Link>
+              <ModeToggle />
+            </div>
           </div>
 
           {/* Chat messages */}
           <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800" ref={chatContainerRef}>
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto px-4">
               {(!activeChat || activeChat.prompts.length === 0) && (
                 <div className="flex flex-col items-center justify-center h-full py-12 space-y-6 text-center">
                   <Bot className="w-16 h-16 text-blue-500 animate-bounce" />
@@ -405,13 +462,13 @@ function HomePage() {
           </div>
 
           {/* Input area */}
-          <div className="border-t border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800">
-            <div className="max-w-3xl mx-auto p-6">
+          <div className="border-t border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 sticky bottom-0">
+            <div className="max-w-3xl mx-auto p-4">
               <div className="flex justify-end mb-2">
                 {loading && (
                   <Button onClick={handleStop} variant="outline" size="sm">
                     <CircleSlash className="mr-2 h-4 w-4" />
-                    Stop generating
+                    <span className="hidden sm:inline">Stop generating</span>
                   </Button>
                 )}
               </div>
@@ -420,19 +477,61 @@ function HomePage() {
                 onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
                 className="flex items-end gap-3 relative"
               >
-                <ModelOptions />
+                {/* Model selector for desktop */}
+                <div className="hidden sm:block">
+                  <ModelOptions />
+                </div>
+
+                {/* Model selector button for mobile */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="sm:hidden h-10 w-10"
+                  onClick={() => setIsModelModalOpen(true)}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+
+                {/* Model selection modal for mobile */}
+                {isModelModalOpen && (
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:hidden">
+                    <div className="bg-white dark:bg-gray-800 w-full rounded-t-xl p-4 animate-slide-up">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-semibold">Select Model</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsModelModalOpen(false)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                      <div className="mb-4">
+                        <ModelOptions />
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={() => setIsModelModalOpen(false)}
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative flex-1">
                   <Input
                     placeholder="Message ChatGPT..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="pr-12 py-6 resize-none bg-white dark:bg-gray-700 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="pr-12 py-6 resize-none bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus-visible:ring-1 focus-visible:ring-blue-500"
                   />
                   <Button
                     type='submit'
                     disabled={loading || !input.trim()}
                     size="icon"
-                    className="absolute right-2 bottom-2 h-8 w-8 bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600 text-white transform transition-all duration-200 hover:scale-110"
+                    className="absolute right-2 bottom-2 h-8 w-8 bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600 text-white transform transition-all duration-200 hover:scale-110 rounded-full"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
