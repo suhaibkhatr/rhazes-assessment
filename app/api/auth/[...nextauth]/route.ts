@@ -42,6 +42,10 @@ const handler = NextAuth({
           throw new Error("Invalid email or password");
         }
 
+        if (!user.emailVerified) {
+          throw new Error("Please verify your email");
+        }
+
         return {
           id: String(user.id), // Convert the id to a string
           name: user.name || "",

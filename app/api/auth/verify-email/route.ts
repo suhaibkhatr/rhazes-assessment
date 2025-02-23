@@ -44,7 +44,7 @@ export async function GET(request: Request) {
         );
       }
       // Redirect to success page
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/auth/email-verified`);
+      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/email-verified`);
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         return NextResponse.json(
